@@ -4,7 +4,6 @@
 import os
 import sys
 import subprocess
-import time
 
 import cv2
 import numpy as np
@@ -93,11 +92,6 @@ class VideoGammaCorrection(Video):
         plt.scatter(pix, self.gamma_lookuptable.reshape(-1,))
         plt.show()
 
-    def plot_tone_curve(self):
-        pix = np.arange(len(self.tone_curve))
-        plt.scatter(pix, self.tone_curve.reshape(-1,))
-        plt.show()
-
 
     def _make_tone_curve(self):
         min_ = self.hparams['min_']
@@ -127,21 +121,15 @@ class VideoGammaCorrection(Video):
         self.tone_curve = self._make_tone_curve()
         print('Hyper parameters have been set as: {}'.format(self.hparams))
 
-    def fit_gamma(self, img):
-        return np.round(cv2.LUT(img, self.gamma_lookuptable)).astype(np.uint8)
-
-    def fit_tone_curve(self, img):
-        return np.round(cv2.LUT(img, self.tone_curve)).astype(np.uint8)
-
     def fit(self):
         video_dir = os.path.split(self._video_file_path)[0]
         self.corrected_frames_dir = os.path.join(
                 os.path.split(self._video_file_path)[0],
                 'corrected_frames'
                 )
+        print(len(self.tone_curve))
         if not os.path.exists(self.corrected_frames_dir):
             os.makedirs(self.corrected_frames_dir)
-        prev_time = time.time()
         for image_file_name in tqdm(os.listdir(self.frame_dir)):
             image_file_path = os.path.join(video_dir, 'frames', image_file_name)
             pict = cv2.imread(image_file_path)
@@ -149,7 +137,7 @@ class VideoGammaCorrection(Video):
                 print('The image has not been loaded. Set accurate file path.')
                 sys.exit(1)
             try:
-                pict = self.fit_gamma(pict)
+                pict = np.round(cv2.LUT(pict, self.gamma_lookuptable)).astype(np.uint8)
             except cv2.error:
                 print('!!gamma correction has been passed because of error.')
             #try:
@@ -163,8 +151,6 @@ class VideoGammaCorrection(Video):
                         ),
                     pict
                     )
-        current_time = time.time()
-        print('elapsed_time: {}'.format(current_time-prev_time))
         self._make_corrected_video()
         self._extract_sound()
         self._merge_video_sound()
@@ -239,5 +225,4 @@ if __name__ == '__main__':
     FRAME_RATE = 30
 
     vcrr = VideoGammaCorrection(BEFORE_FILE_NAME)
-    vcrr.set_hparams(gamma=2.0, max_=240, min_=10)
     vcrr.run(gamma=2.0, max_=240, min_=10)
