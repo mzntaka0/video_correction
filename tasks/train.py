@@ -121,6 +121,11 @@ if __name__ == '__main__':
     feature_vector_func = get_feature_vector
 
     training_data_dict = preprocess(items_dir_list, feature_vector_func)
+
+    ###########################################
+    ###########################################
+
+
     print(training_data_dict.keys())
     set_trace()
 
@@ -171,7 +176,6 @@ if __name__ == '__main__':
         plt.scatter(np.arange(len(feature_vectors)), feature_vectors)
         plt.show()
 
-    train_iter = chainer()
 
     model = DNNRegression()
     optimizer = chainer.optimizers.Adam()

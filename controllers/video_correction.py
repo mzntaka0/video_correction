@@ -35,7 +35,7 @@ class Video:
 
 class VideoGammaCorrection(Video):
     
-    def __init__(self, video_file_path, split=True, frame_dir=None, gamma=2.2, min_=10, max_=240):
+    def __init__(self, video_file_path, split=True, frame_dir=None, gamma=2.2, min_=10, max_=240, fr=30):
         super(VideoGammaCorrection, self).__init__(video_file_path)
         if frame_dir:
             self.frame_dir = frame_dir
@@ -52,6 +52,7 @@ class VideoGammaCorrection(Video):
         self.hparams['min_'] = min_
         self.gamma_lookuptable = self._gamma_lookuptable()
         self.tone_curve = self._make_tone_curve()
+        self.FRAME_RATE = fr
         
     def _video_split(self, ss=0, r=30):
         if os.listdir(self.frame_dir):
@@ -161,11 +162,11 @@ class VideoGammaCorrection(Video):
         video_dir, video_name = os.path.split(self._video_file_path)
         cmd = [
                 'ffmpeg',
-                '-framerate', str(FRAME_RATE),
+                '-framerate', str(self.FRAME_RATE),
                 '-i', os.path.join(self.corrected_frames_dir, image_file),
                 '-vcodec', 'libx264',
                 '-pix_fmt', 'yuv420p',
-                '-r', str(FRAME_RATE),
+                '-r', str(self.FRAME_RATE),
                 os.path.join(video_dir, 'raw_corrected_' + video_name)
                 ]
         subprocess.call(cmd)

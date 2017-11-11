@@ -33,17 +33,21 @@ class LineGeometry(Geometry):
 
     def d(self, p):
         p = np.array(p, dtype=np.float64)
-        return np.abs(self.a*p[0] + self.b*p[1] + self.c) / np.sqrt(self.a**2 + self.b**2)
+        return 2.0 * np.abs(self.a*p[0] + self.b*p[1] + self.c) / np.sqrt(self.a**2 + self.b**2)
 
     def _additional_vector(self, p):
         return self.d(p) * self.normal_vector()
 
-    def point_symmetry(self, p):
+    def line_symmetry(self, p):
         p = np.array(p, dtype=np.float64)
         if self.f(p[0]) > p[1]:
-            return p + self._additional_vector(p)
+            return np.round(p + self._additional_vector(p))
         else:
-            return p - self._additional_vector(p)
+            return np.round(p - self._additional_vector(p))
+
+    def imshow(self):
+        pass
+
 
 
 
@@ -51,4 +55,4 @@ if __name__ == '__main__':
     line_geometry = LineGeometry([[1, 1], [2, 2]])
     print(line_geometry.f(3))
     print(np.sqrt(line_geometry.normal_vector()[0]**2 + line_geometry.normal_vector()[1]**2))
-    print(line_geometry.point_symmetry([3, 0]))
+    print(line_geometry.line_symmetry([0, 3]))
