@@ -14,6 +14,7 @@ import cv2
 import face_recognition
 from PIL import Image, ImageDraw
 import matplotlib.pyplot as plt
+import line_profiler
 
 from controllers.geometry import LineGeometry
 
@@ -64,7 +65,7 @@ def add_whole_face_points(face_landmarks_list):
     return face_landmarks_list
 
 
-def get_raw_and_masked_img(image, face_landmarks_list):
+def get_masked_img(image, face_landmarks_list):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     for face_landmarks in face_landmarks_list:
         pil_image = Image.fromarray(image)
@@ -76,20 +77,21 @@ def get_raw_and_masked_img(image, face_landmarks_list):
 
 def black_mask(image):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # ndarray(rgb)
-    face_landmarks_list = get_face_landmarks(image)
+    face_landmarks_list = face_recognition.face_landmarks(image)
     face_landmarks_list = add_whole_face_points(face_landmarks_list)
-    pil_image = get_raw_and_masked_img(image, face_landmarks_list)
+    pil_image = get_masked_img(image, face_landmarks_list)
     return pil_image
 
 
 
 if __name__ == '__main__':
     img_path = "storage/image/72d780808e3bd6d05b244cbf44280c89.jpg"
+    pr = line_profiler.LineProfiler()
 
     image = face_recognition.load_image_file(img_path)  # ndarray(rgb)
     face_landmarks_list = get_face_landmarks(image)
     face_landmarks_list = add_whole_face_points(face_landmarks_list)
-    raw_masked_dict = get_raw_and_masked_img(image, face_landmarks_list)
+    raw_masked_dict = get_masked_img(image, face_landmarks_list)
 
     gray = cv2.cvtColor(raw_masked_dict['masked'], cv2.COLOR_BGR2GRAY)
     cv2.imshow('gray', gray)

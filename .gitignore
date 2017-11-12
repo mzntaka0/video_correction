@@ -3,3 +3,5 @@
 *.yaml
 __pycache__/*
 *.pyc
+/submodule/
+/junkbox/

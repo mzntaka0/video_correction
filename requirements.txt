@@ -1,4 +1,5 @@
 face_recognition
+line_profiler
 numpy
 matplotlib
 seaborn
