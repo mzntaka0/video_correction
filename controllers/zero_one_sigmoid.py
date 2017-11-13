@@ -27,7 +27,7 @@ if __name__ == '__main__':
     #    plt.ylim(0, 1)
     #    plt.savefig('storage/image/zero_one_sigmoid/{}_inv.png'.format(i))
     #    plt.cla()
-    a = 3.0
+    a = 10.0
     line_x = np.linspace(0, 1)
     plt.plot(line_x, line_x, 'r-')
     plt.scatter(x, inv_zero_one_sigmoid(x, a))
