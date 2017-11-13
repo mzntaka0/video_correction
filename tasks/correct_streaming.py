@@ -18,14 +18,14 @@ def tone_func(x):
     return 255 * ((1 / np.pi) * np.arcsin(2*x - 1) + 1 / 2)
 
 
-def zero_one_sigmoid(x, a=5.0):
+def zero_one_sigmoid(x, a):
     return 255*((1/2)*(1 + ((1 - np.exp(-a*(2*x-1)))) / (1 + np.exp(-a*(2*x - 1))) * (((1 + np.exp(-a)))/(1-np.exp(-a)))))
 
-def inv_zero_one_sigmoid(x, a=4.0):
+def inv_zero_one_sigmoid(x, a):
     return 255*(1 - ((np.log((1 - _X(x, a)) / (1 + _X(x, a))) + a) / (2.0 * a)))
 
-def make_tone_curve(func):
-    return np.array([int(np.round(func(x/256))) for x in np.arange(256)]).reshape(-1, 1).astype(np.uint8)
+def make_contrast_curve(func, a):
+    return np.array([int(np.round(func(x/256, a))) for x in np.arange(256)]).reshape(-1, 1).astype(np.uint8)
 
 
 def tone_func_contrast(x):
@@ -42,12 +42,22 @@ def gamma_lookuptable(gamma):
             gamma_func
             )(np.arange(256, dtype=np.uint8).reshape(-1, 1), gamma)
 
+
+def basic_convert(frame, gamma, a):
+    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    frame = cv2.LUT(frame, make_contrast_curve(zero_one_sigmoid, a=a).astype(np.uint8))
+    frame = cv2.LUT(frame, gamma_lookuptable(gamma=gamma).astype(np.uint8))
+    return frame
+
+
+
 if __name__ == '__main__':
     image_path = 'storage/image/gaikoku.jpg'
-    img = cv2.imread(image_path)
+    gamma = 2.0
+    a = 4.0
+
 
     cap = cv2.VideoCapture(0)
-
     fig, ax = plt.subplots()
 
     while True:
@@ -58,9 +68,7 @@ if __name__ == '__main__':
         #    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         #    pass
 
-        frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        frame = cv2.LUT(frame, make_tone_curve(zero_one_sigmoid).astype(np.uint8))
-        frame = cv2.LUT(frame, gamma_lookuptable(2.0).astype(np.uint8))
+        frame = basic_convert(frame, gamma=gamma, a=a)
         ax.imshow(frame)
         plt.pause(0.05)
         plt.cla()
