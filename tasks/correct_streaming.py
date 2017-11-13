@@ -14,15 +14,18 @@ from mpl_toolkits.mplot3d import Axes3D
 
 from controllers.face_detection import black_mask
 
+
 def tone_func(x):
     return 255 * ((1 / np.pi) * np.arcsin(2*x - 1) + 1 / 2)
-
 
 def zero_one_sigmoid(x, a):
     return 255*((1/2)*(1 + ((1 - np.exp(-a*(2*x-1)))) / (1 + np.exp(-a*(2*x - 1))) * (((1 + np.exp(-a)))/(1-np.exp(-a)))))
 
 def inv_zero_one_sigmoid(x, a):
     return 255*(1 - ((np.log((1 - _X(x, a)) / (1 + _X(x, a))) + a) / (2.0 * a)))
+
+def _X(x, a):
+    return (2*x - 1) * ((1 - np.exp(-a)) / (1 + np.exp(-a)))
 
 def make_contrast_curve(func, a):
     return np.array([int(np.round(func(x/256, a))) for x in np.arange(256)]).reshape(-1, 1).astype(np.uint8)
@@ -31,8 +34,6 @@ def make_contrast_curve(func, a):
 def tone_func_contrast(x):
     return 255 * (np.sin(np.pi*x - np.pi/2) + 1) / 2
 
-def _X(x, a):
-    return (2*x - 1) * ((1 - np.exp(-a)) / (1 + np.exp(-a)))
 
 def gamma_func(i, gamma=2.2):
     return 255 * pow(float(i) / 255, 1.0 / gamma)
@@ -56,11 +57,15 @@ def streaming(gamma, a):
 
     while True:
         ret, frame = cap.read()
-        #try:
-        #    frame = black_mask(frame)
-        #except IndexError:
-        #    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        #    pass
+        try:
+            s = time.time()
+            frame = black_mask(frame)
+            e = time.time()
+            print(e-s)
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        except IndexError:
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            pass
 
         frame = basic_convert(frame, gamma=gamma, a=a)
         ax.imshow(frame)
@@ -71,9 +76,8 @@ def streaming(gamma, a):
 
 
 if __name__ == '__main__':
-    image_path = 'storage/image/gaikoku.jpg'
+    # prediction targets
     gamma = 1.5 
     a = 4.0
 
     streaming(gamma, a)
-

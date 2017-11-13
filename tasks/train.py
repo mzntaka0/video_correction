@@ -3,199 +3,317 @@
 """
 import os
 import sys
+import time
+import argparse
+sys.path.append("./")
 
-import cv2
-from bpdb import set_trace
-import pickle
-import numpy as np
-from sklearn.decomposition import PCA
-import matplotlib.pyplot as plt
-import chainer
-from chainer import training
-from chainer.training import extensions
-import chainer.links as L
-import chainer.functions as F
-
-
-class DNNRegression(chainer.Chain):
-
-    def __init__(self, n_units, n_out):
-        super(MLP, self).__init__(
-                l1=L.Linear(None, n_units),
-                l2=L.Linear(None, n_units),
-                l3=L.Linear(None, n_out),
-                )
-
-    def __call__(self, x):
-        h1 = F.relu(self.l1(x))
-        h2 = F.relu(self.l2(h1))
-        return self.l3(h2)
+import torch
+import torch.nn as nn
+from torch.autograd import Variable
+import torch.nn.functional as F
+from torchvision import transforms
+from tqdm import tqdm, trange
+from modules.errors import FileNotFoundError, GPUNotFoundError, UnknownOptimizationMethodError
+from modules.dataset_indexing.pytorch import PoseDataset, Crop, RandomNoise, Scale
 
 
+def main():
+    """ Main function. """
+    # arg definition
+    parser = argparse.ArgumentParser(
+        description='Training pose net for comparison \
+        between chainer and pytorch about implementing DeepPose.')
+    parser.add_argument(
+        'mode', type=str, choices=['chainer', 'pytorch'], help='Mode of training pose net.')
+    parser.add_argument(
+        '--Nj', '-j', type=int, default=14, help='Number of joints.')
+    parser.add_argument(
+        '--use-visibility', '-v', action='store_true', help='Use visibility to compute loss.')
+    parser.add_argument(
+        '--data-augmentation', '-a', action='store_true', help='Crop randomly and add random noise for data augmentation.')
+    parser.add_argument(
+        '--epoch', '-e', type=int, default=100, help='Number of epochs to train.')
+    parser.add_argument(
+        '--opt', '-o', type=str, default='MomentumSGD',
+        choices=['MomentumSGD', 'Adam'], help='Optimization method.')
+    parser.add_argument(
+        '--gpu', '-g', type=int, default=-1, help='GPU ID (negative value indicates CPU).')
+    parser.add_argument(
+        '--seed', '-s', type=int, help='Random seed to train.')
+    parser.add_argument(
+        '--train', type=str, default='data/train', help='Path to training image-pose list file.')
+    parser.add_argument(
+        '--val', type=str, default='data/test', help='Path to validation image-pose list file.')
+    parser.add_argument(
+        '--batchsize', type=int, default=32, help='Learning minibatch size.')
+    parser.add_argument(
+        '--out', default='result', help='Output directory')
+    parser.add_argument(
+        '--resume', default=None,
+        help='Initialize the trainer from given file. \
+        The file name is "epoch-{epoch number}.iter".')
+    parser.add_argument(
+        '--resume-model', type=str, default=None,
+        help='Load model definition file to use for resuming training \
+        (it\'s necessary when you resume a training). \
+        The file name is "epoch-{epoch number}.mode"')
+    parser.add_argument(
+        '--resume-opt', type=str, default=None,
+        help='Load optimization states from this file \
+        (it\'s necessary when you resume a training). \
+        The file name is "epoch-{epoch number}.state"')
+    args = parser.parse_args()
+    args_dict = vars(args)
+    trainer = TrainNet
+    train = trainer(**args_dict)
+    train.start()
 
-def get_feature_vector(img_path, bins=256):
-    img = cv2.imread(img_path)
-    if img is None:
-        raise ValueError
-    BGR_splited = cv2.split(img)
-    hist_list = list()
-    for color_arr in BGR_splited:
-        hist = np.histogram(color_arr, bins=bins)[0]
-        hist_list.extend(hist / np.linalg.norm(hist))
-    return hist_list
 
-def get_feature_vector2(img_path):
-    img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)
-    if img is None:
-        raise ValueError
-    return np.mean(img)
+class TrainLogger(object):
+    """ Logger of training pose net.
+    Args:
+        out (str): Output directory.
+    """
 
-def target_val_from_file_name(file_name_):
-    return np.array([float(file_name_.split('__')[0].split('_')[-1])], np.float32)
-
-
-def make_this_training_data(items_dir, feature_vector_func):
-    this_training_data_dict_list = list()
-    for file_name_ in os.listdir(items_dir):
+    def __init__(self, out):
         try:
-            this_training_data_dict_list.append(
-                    {
-                        file_name_: {
-                            'feature_vector': feature_vector_func(os.path.join(items_dir, file_name_)),
-                            'target': target_val_from_file_name(file_name_)
-                        }
-                    }
-                )
-        except ValueError:
+            os.makedirs(out)
+        except OSError:
             pass
-    return this_training_data_dict_list
+        self.file = open(os.path.join(out, 'log'), 'w')
+        self.logs = []
 
-def make_whole_training_data(items_dir_list, feature_vector_func):
-    training_data_dict = dict()
-    for items_dir in items_dir_list:
-        dirs_list = filter(lambda f: os.path.isdir(os.path.join(items_dir, f)), os.listdir(items_dir))
-        dirs_list = map(lambda d: os.path.join(items_dir, d), dirs_list)
-        for dir_ in dirs_list:
-            print('Making feature vector of images in {}.'.format(dir_))
-            training_data_dict[dir_] = make_this_training_data(dir_, feature_vector_func)
-                
-    return training_data_dict
+    def write(self, log):
+        """ Write log. """
+        tqdm.write(log)
+        tqdm.write(log, file=self.file)
+        self.logs.append(log)
+
+    def state_dict(self):
+        """ Returns the state of the logger. """
+        return {'logs': self.logs}
+
+    def load_state_dict(self, state_dict):
+        """ Loads the logger state. """
+        self.logs = state_dict['logs']
+        # write logs.
+        tqdm.write(self.logs[-1])
+        for log in self.logs:
+            tqdm.write(log, file=self.file)
 
 
-def preprocess(items_dir_list, feature_vector_func, training_data_save_dir='storage/data', training_data_file='training_data.pickle'):
-    if not os.path.exists(training_data_save_dir):
-        os.makedirs(training_data_save_dir)
+class TrainNet(object):
+    """ Train pose net of estimating 2D pose from image.
+    Args:
+        Nj (int): Number of joints.
+        use_visibility (bool): Use visibility to compute loss.
+        epoch (int): Number of epochs to train.
+        opt (str): Optimization method.
+        gpu (bool): Use GPU.
+        train (str): Path to training image-pose list file.
+        val (str): Path to validation image-pose list file.
+        batchsize (int): Learning minibatch size.
+        out (str): Output directory.
+        resume (str): Initialize the trainer from given file.
+            The file name is 'epoch-{epoch number}.iter'.
+        resume_model (str): Load model definition file to use for resuming training
+            (it\'s necessary when you resume a training).
+            The file name is 'epoch-{epoch number}.model'.
+        resume_opt (str): Load optimization states from this file
+            (it\'s necessary when you resume a training).
+            The file name is 'epoch-{epoch number}.state'.
+    """
 
-    if not os.path.exists(os.path.join(training_data_save_dir, training_data_file)):
-        training_data_dict = make_whole_training_data(items_dir_list, feature_vector_func)
-        try:
-            with open(os.path.join(training_data_save_dir, training_data_file), 'wb') as f:
-                pickle.dump(training_data_dict, f)
-        except:
-            print("Warning: training_data_dict hasn't been saved.")
-            pass
-    else:
-        ans = input('training_data.pickle already exists. Overwrite?[y/n]')
-        if ans == 'y':
-            training_data_dict = make_whole_training_data(items_dir_list, feature_vector_func)
-            try:
-                with open(os.path.join(training_data_save_dir, training_data_file), 'wb') as f:
-                    pickle.dump(training_data_dict, f)
-            except:
-                print("Warning: training_data_dict hasn't been saved.")
-                pass
+    def __init__(self, **kwargs):
+        self.Nj = kwargs['Nj']  # 1
+        self.use_visibility = kwargs['use_visibility']  # False
+        self.data_augmentation = kwargs['data_augmentation']
+        self.epoch = kwargs['epoch']  # 100
+        self.gpu = (kwargs['gpu'] >= 0)  # True
+        self.opt = kwargs['opt']  # 'Adam'
+        self.train = kwargs['train']
+        self.val = kwargs['val']
+        self.batchsize = kwargs['batchsize']  # 100 
+        self.out = kwargs['out']  # 'storage/outputs'
+        self.resume = kwargs['resume']  # 'None'
+        self.resume_model = kwargs['resume_model']  # None
+        self.resume_opt = kwargs['resume_opt']  # None
+        # validate arguments.
+        self._validate_arguments()
+
+    def _validate_arguments(self):
+        if self.gpu and not torch.cuda.is_available():
+            raise GPUNotFoundError('GPU is not found.')
+        for path in (self.train, self.val):
+            if not os.path.isfile(path):
+                raise FileNotFoundError('{0} is not found.'.format(path))
+        if self.opt not in ('MomentumSGD', 'Adam'):
+            raise UnknownOptimizationMethodError(
+                '{0} is unknown optimization method.'.format(self.opt))
+        if self.resume is not None:
+            for path in (self.resume, self.resume_model, self.resume_opt):
+                if not os.path.isfile(path):
+                    raise FileNotFoundError('{0} is not found.'.format(path))
+
+    def _get_optimizer(self, model):
+        if self.opt == 'MomentumSGD':
+            optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
+        elif self.opt == "Adam":
+            optimizer = torch.optim.Adam(model.parameters())
+        return optimizer
+
+    def _train(self, model, optimizer, train_iter, log_interval, logger, start_time):
+        model.train()
+        for iteration, batch in enumerate(tqdm(train_iter, desc='this epoch')):
+            image, target = Variable(batch[0]), Variable(batch[1])
+            if self.gpu:
+                image, target = image.cuda(), target.cuda()
+            optimizer.zero_grad()
+            output = model(image)
+            loss = mean_squared_error(output, target, self.use_visibility)
+            loss.backward()
+            optimizer.step()
+            if iteration % log_interval == 0:
+                log = 'elapsed_time: {0}, loss: {1}'.format(time.time() - start_time, loss.data[0])
+                logger.write(log)
+
+    def _test(self, model, test_iter, logger, start_time):
+        model.eval()
+        test_loss = 0
+        for batch in test_iter:
+            image, target  = Variable(batch[0]), Variable(batch[1])
+            if self.gpu:
+                image, target  = image.cuda(), target.cuda()
+            output = model(image)
+            test_loss += mean_squared_error(output, target, self.use_visibility).data[0]
+        test_loss /= len(test_iter)
+        log = 'elapsed_time: {0}, validation/loss: {1}'.format(time.time() - start_time, test_loss)
+        logger.write(log)
+
+    def _checkpoint(self, epoch, model, optimizer, logger):
+        filename = os.path.join(self.out, 'pytorch', 'epoch-{0}'.format(epoch))
+        torch.save({'epoch': epoch + 1, 'logger': logger.state_dict()}, filename + '.iter')
+        torch.save(model.state_dict(), filename + '.model')
+        torch.save(optimizer.state_dict(), filename + '.state')
+
+    def start(self):
+        """ Train pose net. """
+        # initialize model to train.
+        model = AlexNet(self.Nj)
+        if self.resume_model:
+            model.load_state_dict(torch.load(self.resume_model))
+        # prepare gpu.
+        if self.gpu:
+            model.cuda()
+        input_transforms = [transforms.ToTensor()]
+        if self.data_augmentation:
+            input_transforms.append(RandomNoise())
+        # load the datasets.
+        train = PoseDataset(
+            self.train,
+            input_transform=transforms.Compose(input_transforms),
+            output_transform=Scale(),
+            transform=Crop(data_augmentation=self.data_augmentation))
+        val = PoseDataset(
+            self.val,
+            input_transform=transforms.Compose([
+                transforms.ToTensor()]),
+            output_transform=Scale(),
+            transform=Crop(data_augmentation=False))
+        # training/validation iterators.
+        train_iter = torch.utils.data.DataLoader(train, batch_size=self.batchsize, shuffle=True)
+        val_iter = torch.utils.data.DataLoader(val, batch_size=self.batchsize, shuffle=False)
+        # set up an optimizer.
+        optimizer = self._get_optimizer(model)
+        if self.resume_opt:
+            optimizer.load_state_dict(torch.load(self.resume_opt))
+        # set intervals.
+        val_interval = 10
+        resume_interval = self.epoch/10
+        log_interval = 10
+        # set logger and start epoch.
+        logger = TrainLogger(os.path.join(self.out, 'pytorch'))
+        start_epoch = 1
+        if self.resume:
+            resume = torch.load(self.resume)
+            start_epoch = resume['epoch']
+            logger.load_state_dict(resume['logger'])
+        # start training.
+        start_time = time.time()
+        for epoch in trange(start_epoch, self.epoch + 1, desc='     total'):
+            self._train(model, optimizer, train_iter, log_interval, logger, start_time)
+            if epoch % val_interval == 0:
+                self._test(model, val_iter, logger, start_time)
+            if epoch % resume_interval == 0:
+                self._checkpoint(epoch, model, optimizer, logger)
+
+class AlexNet(nn.Module):
+
+    def __init__(self, Nj=1):
+        super(AlexNet, self).__init__()
+        self.conv1 = nn.Conv2d(3, 96, 11, stride=4)
+        self.conv2 = nn.Conv2d(96, 256, 5, padding=2)
+        self.conv3 = nn.Conv2d(256, 384, 3, padding=1)
+        self.conv4 = nn.Conv2d(384, 384, 3, padding=1)
+        self.conv5 = nn.Conv2d(384, 256, 3, padding=1)
+        self.fc6 = nn.Linear(256*6*6, 4096)
+        self.fc7 = nn.Linear(4096, 4096)
+        self.fc8 = nn.Linear(4096, Nj*2)
+        self.Nj = Nj
+
+    def forward(self, x):
+        # layer1
+        h = F.relu(self.conv1(x))
+        h = F.max_pool2d(h, 3, stride=2)
+        # layer2
+        h = F.relu(self.conv2(h))
+        h = F.max_pool2d(h, 3, stride=2)
+        # layer3-5
+        h = F.relu(self.conv3(h))
+        h = F.relu(self.conv4(h))
+        h = F.relu(self.conv5(h))
+        h = F.max_pool2d(h, 3, stride=2)
+        h = h.view(-1, 256*6*6)
+        # layer6-8
+        h = F.dropout(F.relu(self.fc6(h)), training=self.training)
+        h = F.dropout(F.relu(self.fc7(h)), training=self.training)
+        h = self.fc8(h)
+        return h.view(-1, self.Nj, 2)
+
+
+
+class MeanSquaredError(nn.Module):
+    """ Mean squared error (a.k.a. Euclidean loss) function. """
+
+    def __init__(self, use_visibility=False):
+        super(MeanSquaredError, self).__init__()
+        self.use_visibility = use_visibility
+
+    def forward(self, *inputs):
+        x, t = inputs
+        diff = x - t
+        if self.use_visibility:
+            N = (v.sum()/2).data[0]
+            diff = diff*v
         else:
-            with open(os.path.join(training_data_save_dir, training_data_file), 'rb') as f:
-                training_data_dict = pickle.load(f)
-    return training_data_dict
+            N = diff.numel()/2
+        diff = diff.view(-1)
+        return diff.dot(diff)/N
 
-
-def split_data_from_dict(training_data_dict):
-    pass
+def mean_squared_error(x, t, use_visibility=False):
+    """ Computes mean squared error over the minibatch.
+    Args:
+        x (Variable): Variable holding an float32 vector of estimated pose.
+        t (Variable): Variable holding an float32 vector of ground truth pose.
+        v (Variable): Variable holding an int32 vector of ground truth pose's visibility.
+            (0: invisible, 1: visible)
+        use_visibility (bool): When it is ``True``,
+            the function uses visibility to compute mean squared error.
+    Returns:
+        Variable: A variable holding a scalar of the mean squared error loss.
+    """
+    return MeanSquaredError(use_visibility)(x, t)
 
 
 if __name__ == '__main__':
-    items_dir_list = ['storage/image/agejo/', 'storage/image/bijin/']
-    training_data_save_dir = 'storage/data/'
-    training_data_file = 'training_data.pickle'
-    feature_vector_func = get_feature_vector
-
-    training_data_dict = preprocess(items_dir_list, feature_vector_func)
-
-    ###########################################
-    ###########################################
-
-
-    print(training_data_dict.keys())
-    set_trace()
-
-
-    x_data = map(lambda d: d['feature_vector'], training_data_dict.values())
-    x_data = list(x_data)
-    print(x_data)
-
-
-
-    #set_trace()
-
-    #img_dir_path = ['storage/image/agejo/gamma_corrected_12/']
-    #vivid_val_dict = dict()
-    #feature_vectors = list()
-    #for img_dir in img_dir_path:
-    #    vivid_val_dict[img_dir] = list()
-    #    for i, img_name in enumerate(os.listdir(img_dir)):
-    #        try:
-    #            feature_vector = get_feature_vector2(os.path.join(img_dir, img_name))
-    #            print(feature_vector)
-    #            feature_vectors.append(feature_vector)
-    #            #if i % 200 == 0:
-    #            #    plt.scatter(np.arange(len(feature_vector)), feature_vector)
-    #            #    plt.ylim(0.0, 0.2)
-    #            #    plt.savefig('1')
-    #            #    plt.show()
-    #            vivid_val_dict[img_dir].append(feature_vector)
-    #        except ValueError:
-    #            continue
-        #else:
-        #        plt.scatter(np.arange(len(feature_vector)), feature_vector)
-        #        plt.ylim(0.0, 0.2)
-        #        plt.savefig('2')
-        #        plt.show()
-
-    #for img_dir in img_dir_path:
-    #    pca = PCA(n_components=1)
-    #    feature_vectors = vivid_val_dict[img_dir]
-    #    pca.fit(feature_vectors)
-    #    Xd = pca.fit_transform(feature_vectors)
-    #    plt.scatter(np.arange(len(Xd)), Xd)
-    #    #plt.scatter(Xd[:, 0], Xd[:, 1])
-    #    plt.show()
-
-    for img_dir in img_dir_path:
-        feature_vectors = vivid_val_dict[img_dir]
-        plt.scatter(np.arange(len(feature_vectors)), feature_vectors)
-        plt.show()
-
-
-    model = DNNRegression()
-    optimizer = chainer.optimizers.Adam()
-    optimizer.setup(model)
-    updater = training.StandardUpdater(train_iter, optimizer, device=1)
-    trainer = training.Trainer(updater, (10, 'epoch'), out='result')
-
-    trainer.extend(extentions.Evaluator(test_iter, model, device=10))
-    trainer.extend(extentions.dump_graph('main/loss'))
-    trainer.extend(
-            extensions.PrintReport(
-                [
-                    'epoch', 'main/loss', 'validation/main/loss', 
-                'main/accuracy', 'validation/main/accuracy'
-                ]
-            )
-        )
-    trainer.extend(extensions.ProgressBar())
-    trainer.run()
-
-
-
-
+    main()
