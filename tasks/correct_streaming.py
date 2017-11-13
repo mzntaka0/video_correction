@@ -50,13 +50,7 @@ def basic_convert(frame, gamma, a):
     return frame
 
 
-
-if __name__ == '__main__':
-    image_path = 'storage/image/gaikoku.jpg'
-    gamma = 2.0
-    a = 4.0
-
-
+def streaming(gamma, a):
     cap = cv2.VideoCapture(0)
     fig, ax = plt.subplots()
 
@@ -74,3 +68,12 @@ if __name__ == '__main__':
         plt.cla()
     cap.release()
     cv2.destroyAllWindows()
+
+
+if __name__ == '__main__':
+    image_path = 'storage/image/gaikoku.jpg'
+    gamma = 1.5 
+    a = 4.0
+
+    streaming(gamma, a)
+
