@@ -57,7 +57,7 @@ def basic_convert(frame, gamma, a):
     return frame
 
 
-def streaming(gamma=None, a=None, weight_max):
+def streaming(gamma=None, a=None, weight_max=1.0):
     gamma = 0.0
     a = 0.0
     model = AlexNet()
