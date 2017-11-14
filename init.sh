@@ -1,4 +1,7 @@
-pip install -r requirements.txt
+# if you confuse about installing face_recognition, then check this.
+# https://github.com/ageitgey/face_recognition/issues/94
+
+pip install --no-dependencies face_recognition
 conda install -c https://conda.anaconda.org/menpo opencv3
 brew install cmake
 brew install boost-python
@@ -12,3 +15,4 @@ python setup.py install
 cd ..
 rm -rf colorcorrect
 
+pip install -r requirements.txt

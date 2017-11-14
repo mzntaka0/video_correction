@@ -1,4 +1,7 @@
 face_recognition
+face_recognition_models
+Click
+Pillow
 line_profiler
 numpy
 matplotlib
