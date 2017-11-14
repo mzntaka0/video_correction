@@ -244,10 +244,10 @@ class TrainNet(object):
         start_time = time.time()
         for epoch in trange(start_epoch, self.epoch + 1, desc='     total'):
             self._train(model, optimizer, train_iter, log_interval, logger, start_time)
-            if epoch % val_interval == 0:
-                self._test(model, val_iter, logger, start_time)
-            if epoch % resume_interval == 0:
-                self._checkpoint(epoch, model, optimizer, logger)
+            #if epoch % val_interval == 0:
+            self._test(model, val_iter, logger, start_time)
+            #if epoch % resume_interval == 0:
+            self._checkpoint(epoch, model, optimizer, logger)
 
 class AlexNet(nn.Module):
 
