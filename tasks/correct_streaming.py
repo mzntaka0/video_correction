@@ -52,8 +52,8 @@ def gamma_lookuptable(gamma):
 
 def basic_convert(frame, gamma, a):
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    frame = cv2.LUT(frame, make_contrast_curve(zero_one_sigmoid, a=a).astype(np.uint8))
     frame = cv2.LUT(frame, gamma_lookuptable(gamma=gamma).astype(np.uint8))
+    frame = cv2.LUT(frame, make_contrast_curve(zero_one_sigmoid, a=a).astype(np.uint8))
     return frame
 
 
@@ -68,11 +68,13 @@ def streaming(gamma=None, a=None):
     pred_frame = cv2.cvtColor(pred_frame, cv2.COLOR_BGR2HSV)
     pred_frame = cv2.resize(pred_frame, (256, 256))
     output = model(Variable(torch.Tensor(np.array([pred_frame]).astype(np.float32)).view(1, 3, 256, 256)))
-    print(type(output))
     gamma, a = output.data.numpy()[0][0]
     print('gamma: {}, a: {}'.format(gamma, a))
-
+    gamma_list = list()
+    a_list = list()
+    cnt = 0
     while True:
+        cnt += 1
         ret, frame = cap.read()
         #try:
         #    frame = black_mask(frame)
@@ -81,6 +83,13 @@ def streaming(gamma=None, a=None):
         #    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         #    pass
 
+        output = model(Variable(torch.Tensor(np.array([pred_frame]).astype(np.float32)).view(1, 3, 256, 256)))
+        gamma0, a0 = output.data.numpy()[0][0]
+        gamma_list.append(gamma0)
+        a_list.append(a0)
+        gamma = sum(gamma_list) / len(gamma_list)
+        a = sum(a_list) / len(gamma_list)
+        print('gamma: {}, a: {}'.format(gamma, a))
         frame = basic_convert(frame, gamma=gamma, a=a)
         ax.imshow(frame)
         plt.pause(0.05)

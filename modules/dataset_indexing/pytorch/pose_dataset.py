@@ -50,7 +50,7 @@ class PoseDataset(data.Dataset):
         cnt = 0
         for dir_path, info_list in data_dict.items():
             cnt += 1
-            if cnt > 3:
+            if cnt > 10:
                 break
             if 'agejo' in dir_path:
                 continue
