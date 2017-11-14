@@ -96,7 +96,7 @@ def streaming(gamma=None, a=None, weight_max=1.0, mean_average=True):
         ax.imshow(corrected_frame)
         plt.pause(0.05)
         plt.cla()
-        if len(gamma_list) > 20:
+        if len(gamma_list) > 100:
             gamma_list = [gamma]
             a_list = [a]
 
