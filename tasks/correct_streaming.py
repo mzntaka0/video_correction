@@ -52,8 +52,8 @@ def gamma_lookuptable(gamma):
 
 def basic_convert(frame, gamma, a):
     frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-    frame = cv2.LUT(frame, gamma_lookuptable(gamma=gamma).astype(np.uint8))
     frame = cv2.LUT(frame, make_contrast_curve(zero_one_sigmoid, a=a).astype(np.uint8))
+    frame = cv2.LUT(frame, gamma_lookuptable(gamma=gamma).astype(np.uint8))
     return frame
 
 
@@ -84,11 +84,12 @@ def streaming(gamma=None, a=None):
         #    pass
 
         output = model(Variable(torch.Tensor(np.array([pred_frame]).astype(np.float32)).view(1, 3, 256, 256)))
+        print(output)
         gamma0, a0 = output.data.numpy()[0][0]
         gamma_list.append(gamma0)
         a_list.append(a0)
-        gamma = sum(gamma_list) / len(gamma_list)
-        a = sum(a_list) / len(gamma_list)
+        gamma = np.dot(np.array(gamma_list), np.linspace(0.1, 1.0, len(gamma_list))) / len(gamma_list)
+        a = np.dot(np.array(a_list), np.linspace(0.1, 1.0, len(a_list))) / len(a_list)
         print('gamma: {}, a: {}'.format(gamma, a))
         frame = basic_convert(frame, gamma=gamma, a=a)
         ax.imshow(frame)
