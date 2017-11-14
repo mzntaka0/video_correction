@@ -49,8 +49,10 @@ class PoseDataset(data.Dataset):
             data_dict = pickle.load(f)
         cnt = 0
         for dir_path, info_list in data_dict.items():
-            print(dir_path)
-            if cnt == 1:
+            cnt += 1
+            if cnt > 3:
+                break
+            if 'agejo' in dir_path:
                 continue
             for info_dict in info_list:
                 for key, val in info_dict.items():
@@ -60,10 +62,9 @@ class PoseDataset(data.Dataset):
                                 )
                             )
                     target.append(val['target'])
-            cnt += 1
         return images, target
 
 
     @staticmethod
     def _read_image(path):
-        return Image.open(path).convert('HSV')
+        return Image.open(path).convert('HSV').resize((256, 256))

@@ -122,10 +122,46 @@ def get_feature_vector_hsv(img_path):
     return np.array([0])
 
 
+def split_train_test(pickle_path):
+    with open(pickle_path, 'rb') as f:
+        training_data_dict = pickle.load(f)
+
+    N = len(training_data_dict.keys())
+    train_dict = dict()
+    test_dict = dict()
+    cnt = 0
+    for key, val in training_data_dict.items():
+        if 'agejo' in key:
+            continue
+        if cnt >= int(N/2):
+            train_dict[key] = list()
+            for target_dict in val:
+                train_dict[key] = val
+        else:
+            test_dict[key] = list()
+            for target_dict in val:
+                test_dict[key] = val
+        cnt += 1
+
+    with open('storage/data/train_dict.pickle', 'wb') as f:
+        pickle.dump(train_dict, f)
+
+    with open('storage/data/test_dict.pickle', 'wb') as f:
+        pickle.dump(test_dict, f)
+
+
+
+
+
+
+
+
 if __name__ == '__main__':
-    items_dir_list = ['storage/image/bijin/']
+    items_dir_list = ['storage/image/agejo/', 'storage/image/bijin/']
     training_data_save_dir = 'storage/data/'
     training_data_file = 'training_data_hsv.pickle'
+    split_train_test(os.path.join(training_data_save_dir, training_data_file))
+    set_trace()
     feature_vector_func = get_feature_vector_hsv
 
     training_data_dict = preprocess(items_dir_list, feature_vector_func)

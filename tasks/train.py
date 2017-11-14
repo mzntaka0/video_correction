@@ -15,6 +15,7 @@ from torchvision import transforms
 from tqdm import tqdm, trange
 from modules.errors import FileNotFoundError, GPUNotFoundError, UnknownOptimizationMethodError
 from modules.dataset_indexing.pytorch import PoseDataset, Crop, RandomNoise, Scale
+from bpdb import set_trace
 
 
 def main():
@@ -170,6 +171,7 @@ class TrainNet(object):
                 image, target = image.cuda(), target.cuda()
             optimizer.zero_grad()
             output = model(image)
+            print(output)
             loss = mean_squared_error(output, target, self.use_visibility)
             loss.backward()
             optimizer.step()
@@ -233,7 +235,7 @@ class TrainNet(object):
         log_interval = 10
         # set logger and start epoch.
         logger = TrainLogger(os.path.join(self.out, 'pytorch'))
-        start_epoch = 1
+        start_epoch = 0
         if self.resume:
             resume = torch.load(self.resume)
             start_epoch = resume['epoch']

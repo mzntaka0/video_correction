@@ -8,11 +8,17 @@ import time
 import cv2
 import imutils
 from bpdb import set_trace
+from torch.autograd import Variable
 import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import torch
 
 from controllers.face_detection import black_mask
+from tasks.train import AlexNet
+
+
+
 
 
 def tone_func(x):
@@ -51,21 +57,29 @@ def basic_convert(frame, gamma, a):
     return frame
 
 
-def streaming(gamma, a):
+def streaming(gamma=None, a=None):
+    gamma = 0.0
+    a = 0.0
+    model = AlexNet()
+    model.load_state_dict(torch.load('result/pytorch/epoch-0.model'))
     cap = cv2.VideoCapture(0)
     fig, ax = plt.subplots()
+    _, pred_frame = cap.read()
+    pred_frame = cv2.cvtColor(pred_frame, cv2.COLOR_BGR2HSV)
+    pred_frame = cv2.resize(pred_frame, (256, 256))
+    output = model(Variable(torch.Tensor(np.array([pred_frame]).astype(np.float32)).view(1, 3, 256, 256)))
+    print(type(output))
+    gamma, a = output.data.numpy()[0][0]
+    print('gamma: {}, a: {}'.format(gamma, a))
 
     while True:
         ret, frame = cap.read()
-        try:
-            s = time.time()
-            frame = black_mask(frame)
-            e = time.time()
-            print(e-s)
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        except IndexError:
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            pass
+        #try:
+        #    frame = black_mask(frame)
+        #    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        #except IndexError:
+        #    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        #    pass
 
         frame = basic_convert(frame, gamma=gamma, a=a)
         ax.imshow(frame)

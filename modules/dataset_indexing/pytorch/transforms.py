@@ -3,6 +3,8 @@
 
 import random
 import numpy as np
+from PIL import Image
+import cv2
 import torch
 
 
@@ -71,3 +73,11 @@ class Scale(object):
 
     def __call__(self, pose):
         return pose/self.value
+
+if __name__ == '__main__':
+    img_path = 'storage/image/076.jpg'
+
+    img = Image.open(img_path).convert('HSV').resize((256, 256))
+    print(RandomNoise()(img).shape)
+
+    
