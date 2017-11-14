@@ -87,7 +87,7 @@ def make_whole_training_data(items_dir_list, feature_vector_func):
     return training_data_dict
 
 
-def preprocess(items_dir_list, feature_vector_func, training_data_save_dir='storage/data', training_data_file='training_data_hsv.pickle'):
+def preprocess(items_dir_list, feature_vector_func, training_data_save_dir='storage/data', training_data_file='training_data.pickle'):
     if not os.path.exists(training_data_save_dir):
         os.makedirs(training_data_save_dir)
 
@@ -160,13 +160,12 @@ def split_train_test(pickle_path):
 if __name__ == '__main__':
     items_dir_list = ['storage/image/agejo/', 'storage/image/bijin/']
     training_data_save_dir = 'storage/data/'
-    training_data_file = 'training_data_hsv.pickle'
-    split_train_test(os.path.join(training_data_save_dir, training_data_file))
-    set_trace()
+    training_data_file = 'training_data.pickle'
     feature_vector_func = get_feature_vector_hsv
 
     training_data_dict = preprocess(items_dir_list, feature_vector_func)
 
+    split_train_test(os.path.join(training_data_save_dir, training_data_file))
     ###########################################
     ###########################################
 

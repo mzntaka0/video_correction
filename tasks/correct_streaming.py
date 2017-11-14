@@ -57,7 +57,7 @@ def basic_convert(frame, gamma, a):
     return frame
 
 
-def streaming(gamma=None, a=None, weight_max=1.0):
+def streaming(gamma=None, a=None, weight_max=1.0, mean_average=True):
     gamma = 0.0
     a = 0.0
     model = AlexNet()
@@ -73,30 +73,36 @@ def streaming(gamma=None, a=None, weight_max=1.0):
     print('gamma: {}, a: {}'.format(gamma, a))
     gamma_list = list()
     a_list = list()
-    cnt = 0
     while True:
-        cnt += 1
         ret, frame = cap.read()
-        try:
-            frame = black_mask(frame)
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        except IndexError:
-            pass
+        #try:
+        #    frame = black_mask(frame)
+        #    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        #except IndexError:
+        #    pass
 
         output = model(Variable(torch.Tensor(np.array([pred_frame]).astype(np.float32)).view(1, 3, 256, 256)))
         gamma0, a0 = output.data.numpy()[0][0]
-        gamma_list.append(gamma0)
-        a_list.append(a0)
-        gamma = np.dot(np.array(gamma_list), np.linspace(0.1, weight_max, len(gamma_list))) / len(gamma_list)
-        a = np.dot(np.array(a_list), np.linspace(0.1, weight_max, len(a_list))) / len(a_list)
-        print('gamma: {}, a: {}'.format(gamma, a))
+        if mean_average:
+            gamma_list.append(gamma0)
+            a_list.append(a0)
+            gamma = np.dot(np.array(gamma_list), np.linspace(0.1, weight_max, len(gamma_list))) / len(gamma_list)
+            a = np.dot(np.array(a_list), np.linspace(0.1, weight_max, len(a_list))) / len(a_list)
+            print('gamma: {}, a: {}'.format(gamma, a))
+        else:
+            gamma = gamma0
+            a = a0
         corrected_frame = basic_convert(frame, gamma=gamma, a=a)
         ax.imshow(corrected_frame)
         plt.pause(0.05)
         plt.cla()
+        if len(gamma_list) > 20:
+            gamma_list = [gamma]
+            a_list = [a]
+
     cap.release()
     cv2.destroyAllWindows()
 
 
 if __name__ == '__main__':
-    streaming(weight_max=1.0)
+    streaming(weight_max=1.0, mean_average=True)
