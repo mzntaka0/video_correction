@@ -51,51 +51,77 @@ def gamma_lookuptable(gamma):
 
 
 def basic_convert(frame, gamma, a):
-    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     frame = cv2.LUT(frame, make_contrast_curve(zero_one_sigmoid, a=a).astype(np.uint8))
     frame = cv2.LUT(frame, gamma_lookuptable(gamma=gamma).astype(np.uint8))
     return frame
 
+def basic_convert_inv(frame, gamma, a):
+    frame = cv2.LUT(frame, make_contrast_curve(inv_zero_one_sigmoid, a=a).astype(np.uint8))
+    frame = cv2.LUT(frame, gamma_lookuptable(gamma=gamma).astype(np.uint8))
+    return frame
 
-def streaming(gamma=None, a=None, weight_max=1.0, mean_average=True):
+def streaming(gamma=None, a=None, weight_max=1.0, mean_average=True, dpi=150):
     gamma = 0.0
     a = 0.0
     model = AlexNet()
-    model.load_state_dict(torch.load('result/pytorch/epoch-3.model'))
+    model.load_state_dict(torch.load('result/pytorch/epoch-0.model'))
     cap = cv2.VideoCapture(0)
-    fig, ax = plt.subplots()
-    plt.subplots_adjust(left=None, right=None, top=None, wspace=0, hspace=0)
-    _, pred_frame = cap.read()
-    pred_frame = cv2.cvtColor(pred_frame, cv2.COLOR_BGR2HSV)
-    pred_frame = cv2.resize(pred_frame, (256, 256))
-    output = model(Variable(torch.Tensor(np.array([pred_frame]).astype(np.float32)).view(1, 3, 256, 256)))
-    gamma, a = output.data.numpy()[0][0]
-    print('gamma: {}, a: {}'.format(gamma, a))
+    #cap = cv2.VideoCapture(0)
+    fig, axes = plt.subplots(1, 2, dpi=dpi)
+    fig.subplots_adjust(left=0.0, right=1.0, bottom=0.0, top=1.0, hspace=0.0, wspace=0.0)
+    for ax in axes:
+        ax.tick_params(labelbottom='off', bottom='off')
+        ax.tick_params(labelleft='off', left='off')
+        ax.set_xticklabels([])
+        ax.axis('off')
+    #plt.subplots_adjust(left=None, right=None, top=None, wspace=0, hspace=0)
+    #_, pred_frame = cap.read()
+    #pred_frame = cv2.cvtColor(pred_frame, cv2.COLOR_BGR2HSV)
+    #pred_frame = cv2.resize(pred_frame, (256, 256))
+    #output = model(Variable(torch.Tensor(np.array([pred_frame]).astype(np.float32)).view(1, 3, 256, 256)))
+    #gamma, a = output.data.numpy()[0][0]
+    #print('gamma: {}, a: {}'.format(gamma, a))
+    black_array = np.array([0, 0, 0])
     gamma_list = list()
     a_list = list()
     while True:
         ret, frame = cap.read()
-        #try:
-        #    frame = black_mask(frame)
-        #    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        #except IndexError:
-        #    pass
+        raw_frame = frame
+        try:
+            masked_frame = black_mask(raw_frame)
+            mask = cv2.inRange(masked_frame, black_array, black_array)
+            frame = cv2.bitwise_and(frame, frame, mask=mask)
+            #frame = cv2.LUT(frame, gamma_lookuptable(1.5))
+            filter_frame = basic_convert(frame, gamma=2.5, a=2.0)
+            filter_frame = cv2.GaussianBlur(filter_frame, (25, 25), 6.0)
+            raw_frame = cv2.addWeighted(raw_frame, 0.9, filter_frame, 0.8, 2.0)
+            raw_frame = cv2.cvtColor(raw_frame, cv2.COLOR_BGR2RGB)
+            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
-        output = model(Variable(torch.Tensor(np.array([pred_frame]).astype(np.float32)).view(1, 3, 256, 256)))
-        gamma0, a0 = output.data.numpy()[0][0]
-        if mean_average:
-            gamma_list.append(gamma0)
-            a_list.append(a0)
-            gamma = np.dot(np.array(gamma_list), np.linspace(0.1, weight_max, len(gamma_list))) / len(gamma_list)
-            a = np.dot(np.array(a_list), np.linspace(0.1, weight_max, len(a_list))) / len(a_list)
-            print('gamma: {}, a: {}'.format(gamma, a))
-        else:
-            gamma = gamma0
-            a = a0
-        corrected_frame = basic_convert(frame, gamma=gamma, a=a)
-        ax.imshow(corrected_frame)
+        except IndexError or UnboundLocalError:
+            pass
+        #output = model(Variable(torch.Tensor(np.array([frame]).astype(np.float32)).view(1, 3, 256, 256)))
+        #gamma0, a0 = output.data.numpy()[0][0]
+        #if mean_average:
+        #    gamma_list.append(gamma0)
+        #    a_list.append(a0)
+        #    gamma = np.dot(np.array(gamma_list), np.linspace(0.1, weight_max, len(gamma_list))) / len(gamma_list)
+        #    a = np.dot(np.array(a_list), np.linspace(0.1, weight_max, len(a_list))) / len(a_list)
+        #    print('gamma: {}, a: {}'.format(gamma, a))
+        #else:
+        #    gamma = gamma0
+        #    a = a0
+        #    print('gamma: {}, a: {}'.format(gamma, a))
+        #if a > 6.0:
+        #    a = 6.0
+        #if gamma > 4.0:
+        #    gamma = 4.0
+        #frame = basic_convert(frame, gamma=gamma, a=a)
+        axes[0].imshow(frame)
+        axes[1].imshow(raw_frame)
         plt.pause(0.05)
         plt.cla()
+
         if len(gamma_list) > 100:
             gamma_list = [gamma]
             a_list = [a]
@@ -105,4 +131,4 @@ def streaming(gamma=None, a=None, weight_max=1.0, mean_average=True):
 
 
 if __name__ == '__main__':
-    streaming(weight_max=1.0, mean_average=True)
+    streaming(weight_max=1.0, mean_average=True, dpi=150)

@@ -67,18 +67,19 @@ def add_whole_face_points(face_landmarks_list):
 
 def get_masked_img(image, face_landmarks_list):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    pil_image = Image.fromarray(image)
     for face_landmarks in face_landmarks_list:
-        pil_image = Image.fromarray(image)
         d = ImageDraw.Draw(pil_image, 'RGBA')
-        d.polygon(face_landmarks['chin'], fill=(0, 0, 0, 255))
+        d.polygon(face_landmarks['right_eyebrow'] + face_landmarks['chin'][::-1] + face_landmarks['left_eyebrow'], fill=(0, 0, 0, 255))
     pil_image = cv2.cvtColor(np.asarray(pil_image), cv2.COLOR_RGB2BGR)
     return pil_image
+
 
 
 def black_mask(image):
     image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)  # ndarray(rgb)
     face_landmarks_list = face_recognition.face_landmarks(image)
-    face_landmarks_list = add_whole_face_points(face_landmarks_list)
+    #face_landmarks_list = add_whole_face_points(face_landmarks_list)
     pil_image = get_masked_img(image, face_landmarks_list)
     return pil_image
 
@@ -86,14 +87,16 @@ def black_mask(image):
 
 if __name__ == '__main__':
     img_path = "storage/image/72d780808e3bd6d05b244cbf44280c89.jpg"
-    pr = line_profiler.LineProfiler()
 
     image = face_recognition.load_image_file(img_path)  # ndarray(rgb)
     face_landmarks_list = get_face_landmarks(image)
+    masked = get_masked_img(image, face_landmarks_list)
+    cv2.imshow('masked', masked)
+    set_trace()
     face_landmarks_list = add_whole_face_points(face_landmarks_list)
     raw_masked_dict = get_masked_img(image, face_landmarks_list)
 
-    gray = cv2.cvtColor(raw_masked_dict['masked'], cv2.COLOR_BGR2GRAY)
+    #gray = cv2.cvtColor(raw_masked_dict['masked'], cv2.COLOR_BGR2GRAY)
     cv2.imshow('gray', gray)
     print(gray.shape)
     mask = np.where(gray <= 0, 255, 0)
@@ -385,7 +388,7 @@ if __name__ == '__main__':
         #d.line(face_landmarks['right_eye'] + [face_landmarks['right_eye'][0]], fill=(0, 0, 0, 110), width=6)
         #face_landmarks['chin'].append((880, 239))
 
-        d.polygon(face_landmarks['chin'], fill=(255, 255, 255, 255))
+        d.polygon(face_landmarks['left_eyebrow'] + face_landmarks['right_eyebrow'] + face_landmarks['chin'], fill=(255, 255, 255, 255))
 
         pil_image.show()
 
