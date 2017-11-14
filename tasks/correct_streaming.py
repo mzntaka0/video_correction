@@ -60,7 +60,7 @@ def basic_convert_inv(frame, gamma, a):
     frame = cv2.LUT(frame, gamma_lookuptable(gamma=gamma).astype(np.uint8))
     return frame
 
-def streaming(gamma=None, a=None, weight_max=1.0, mean_average=True, dpi=150):
+def streaming(gamma=None, a=None, weight_max=1.0, mean_average=True, dpi=150, correction_rate=0.4):
     gamma = 0.0
     a = 0.0
     model = AlexNet()
@@ -91,10 +91,10 @@ def streaming(gamma=None, a=None, weight_max=1.0, mean_average=True, dpi=150):
             masked_frame = black_mask(raw_frame)
             mask = cv2.inRange(masked_frame, black_array, black_array)
             frame = cv2.bitwise_and(frame, frame, mask=mask)
-            #frame = cv2.LUT(frame, gamma_lookuptable(1.5))
             filter_frame = basic_convert(frame, gamma=2.5, a=2.0)
             filter_frame = cv2.GaussianBlur(filter_frame, (25, 25), 6.0)
-            raw_frame = cv2.addWeighted(raw_frame, 0.9, filter_frame, 0.8, 2.0)
+            cv2.imshow('filter', filter_frame)
+            raw_frame = cv2.addWeighted(raw_frame, 0.9, filter_frame, correction_rate, 2.0)
             raw_frame = cv2.cvtColor(raw_frame, cv2.COLOR_BGR2RGB)
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
 
@@ -131,4 +131,12 @@ def streaming(gamma=None, a=None, weight_max=1.0, mean_average=True, dpi=150):
 
 
 if __name__ == '__main__':
-    streaming(weight_max=1.0, mean_average=True, dpi=150)
+    """
+    params:
+        - weight_max[float+]: mean average power against newest parameter estimation
+        - mean_average[bool]: if not, the estimated params will be directly refrected to the image(tend to flick)
+        - dpi[int]: the size of output window
+        - correction_rate: the gain to how much correct the face
+    """
+    streaming(weight_max=1.0, mean_average=True, dpi=150, correction_rate=0.4)
+
