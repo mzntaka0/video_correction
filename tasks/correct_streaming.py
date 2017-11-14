@@ -57,13 +57,14 @@ def basic_convert(frame, gamma, a):
     return frame
 
 
-def streaming(gamma=None, a=None):
+def streaming(gamma=None, a=None, weight_max):
     gamma = 0.0
     a = 0.0
     model = AlexNet()
-    model.load_state_dict(torch.load('result/pytorch/epoch-0.model'))
+    model.load_state_dict(torch.load('result/pytorch/epoch-3.model'))
     cap = cv2.VideoCapture(0)
     fig, ax = plt.subplots()
+    plt.subplots_adjust(left=None, right=None, top=None, wspace=0, hspace=0)
     _, pred_frame = cap.read()
     pred_frame = cv2.cvtColor(pred_frame, cv2.COLOR_BGR2HSV)
     pred_frame = cv2.resize(pred_frame, (256, 256))
@@ -76,23 +77,20 @@ def streaming(gamma=None, a=None):
     while True:
         cnt += 1
         ret, frame = cap.read()
-        #try:
-        #    frame = black_mask(frame)
-        #    frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-        #except IndexError:
-        #    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        #    pass
+        try:
+            frame = black_mask(frame)
+            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        except IndexError:
+            pass
 
         output = model(Variable(torch.Tensor(np.array([pred_frame]).astype(np.float32)).view(1, 3, 256, 256)))
-        print(output)
         gamma0, a0 = output.data.numpy()[0][0]
         gamma_list.append(gamma0)
         a_list.append(a0)
-        gamma = np.dot(np.array(gamma_list), np.linspace(0.1, 1.5, len(gamma_list))) / len(gamma_list)
-        a = np.dot(np.array(a_list), np.linspace(0.1, 1.5, len(a_list))) / len(a_list)
+        gamma = np.dot(np.array(gamma_list), np.linspace(0.1, weight_max, len(gamma_list))) / len(gamma_list)
+        a = np.dot(np.array(a_list), np.linspace(0.1, weight_max, len(a_list))) / len(a_list)
         print('gamma: {}, a: {}'.format(gamma, a))
         corrected_frame = basic_convert(frame, gamma=gamma, a=a)
-        cv2.imshow('normal', frame)
         ax.imshow(corrected_frame)
         plt.pause(0.05)
         plt.cla()
@@ -101,8 +99,4 @@ def streaming(gamma=None, a=None):
 
 
 if __name__ == '__main__':
-    # prediction targets
-    gamma = 1.5 
-    a = 4.0
-
-    streaming(gamma, a)
+    streaming(weight_max=1.0)

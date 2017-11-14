@@ -31,8 +31,8 @@ class ImageGammaCorrection:
         self.hparams['max_'] = max_
         self.hparams['min_'] = min_
         self.hparams['a'] = a
-        self.gamma_list = np.arange(1.0, 2.51, 0.1)
-        self.a_list = np.arange(1.0, 5.01, 0.1)
+        self.gamma_list = np.arange(2.51, 4.51, 0.5)
+        self.a_list = np.arange(3.0, 6.01, 0.5)
         self.gamma_lookuptable = self._gamma_lookuptable()
         self.tone_curve = self._make_tone_curve()
         self.contrast_curve = self.make_contrast_lookuptable(self._zero_one_sigmoid, a)

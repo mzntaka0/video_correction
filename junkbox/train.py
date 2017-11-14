@@ -133,6 +133,7 @@ def split_train_test(pickle_path):
     for key, val in training_data_dict.items():
         if 'agejo' in key:
             continue
+        print(key)
         if cnt >= int(N/2):
             train_dict[key] = list()
             for target_dict in val:
@@ -143,10 +144,10 @@ def split_train_test(pickle_path):
                 test_dict[key] = val
         cnt += 1
 
-    with open('storage/data/train_dict.pickle', 'wb') as f:
+    with open('storage/data/train_dict_darker.pickle', 'wb') as f:
         pickle.dump(train_dict, f)
 
-    with open('storage/data/test_dict.pickle', 'wb') as f:
+    with open('storage/data/test_dict_darker.pickle', 'wb') as f:
         pickle.dump(test_dict, f)
 
 
