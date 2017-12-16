@@ -24,10 +24,11 @@ class Video:
     def __init__(self, video_file_path):
         self._video_file_path = video_file_path
         self._data = cv2.VideoCapture(video_file_path)
-        self.fps = int(self._data.get(7))
-        if self.fps == 0:
+        self.frame_num = int(self._data.get(7))
+        if self.frame_num == 0:
             print("Couldn't read the video file. Please try again.")
             sys.exit(1)
+        self.fps = round(self._data.get(cv2.CAP_PROP_FPS) )
         self.flag, self.frame = self._data.read()
         self.shape = self.frame.shape
 
