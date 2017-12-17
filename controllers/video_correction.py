@@ -28,7 +28,7 @@ class Video:
         if self.frame_num == 0:
             print("Couldn't read the video file. Please try again.")
             sys.exit(1)
-        self.fps = round(self._data.get(cv2.CAP_PROP_FPS) )
+        self.fps = round(self._data.get(cv2.CAP_PROP_FPS))
         self.flag, self.frame = self._data.read()
         self.shape = self.frame.shape
 

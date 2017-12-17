@@ -5,18 +5,79 @@ import os
 import sys
 import subprocess
 from collections import OrderedDict
-
+try:
+    from bpdb import set_trace
+except ImportError:
+    from pdb import set_trace
 
 import cv2
 
 from controllers.video_correction import Video
 
 
+class ProjectBase:
+    """
+    [super class]
+    when you start new project to edit videos, this class will be the director of whole operations.
+    this class provides the initialization of the project. make initial directories following.
+       - raws: raw video data not edited
+       - cropped: cropped video data
+       - rendered: rendered video data
+
+    Args:
+        - project_name[str]: the project name what you want to make
+        - project_path[str](option): the path which you want to start project
+    """
+
+    def __init__(self, project_name, project_path=os.path.abspath('storage/projects')):
+        self.project_name = project_name
+        self.project_path = project_path
+        self.project_root = os.path.join(project_path, project_name)
+
+    def init(self):
+        if not os.path.exists(self.project_root):
+            os.makedirs(self.project_root)
+            self._project_dirs()
+            print('Please put videos to {}/raw'.format(self.project_name))
+            ans = input('Continue?[y/n]: ')
+            if not ans == 'y':
+                sys.exit(0)
+        else:
+            print('Loading the project "{}". Enjoy Editing.'.format(self.project_name))
+        
+    def _project_dirs(self):
+        os.makedirs(os.path.join(self.project_root, 'raw'))
+        os.makedirs(os.path.join(self.project_root, 'cropped'))
+        os.makedirs(os.path.join(self.project_root, 'rendered'))
+
+
+class Project(ProjectBase):
+    """
+    this class provides the project editing 
+    """
+
+    def __init__(self, project_name, project_path=os.path.abspath('storage/projects')):
+        super(Project, self).__init__(project_name, project_path=project_path)
+        self.video_extension = ['.mov', '.mp4']
+
+    def crop_mode(self, video_name, ext='mov'):
+        video_path = os.path.join(self.project_root, 'raw', '{}.{}'.format(video_name, ext))
+        if not os.path.exists(video_path):
+            raise FileNotFoundError('the video "{}" does not exists.'.format(os.path.split(video_path)[1]))
+        cropped_dir = os.path.join(self.project_root, 'cropped', video_name + '_cropped')
+        return CropVideo(video_path, cropped_dir=cropped_dir)
+
+    def render_mode(self):
+        pass
+
+
+
 class CropVideo:
     """
-    this class manipulate the videos on the disk using ffmpeg, not putting on the memory(in case of huge video data.)
+    this class operates the videos on the disk using ffmpeg, not putting on the memory(in case of huge video data.)
     Args:
         - video_path[str]: the target video file path
+        - cropped_dir[str](option): just in case you want to specify the path of cropped videos.
     """
 
     def __init__(self, video_path, cropped_dir=None):
@@ -98,17 +159,14 @@ class CropVideo:
             os.makedirs(rendered_dir)
         rendered_name = os.path.splitext(_splited_path[1])[0] + 'rendered_' + str(len(os.listdir(rendered_dir)))
         _output_path = os.path.join(rendered_dir, rendered_name)
-        print(_output_path)
         cmd = ['ffmpeg'] + rendering_video_cmd + ['-filter_complex', 'concat=n={}:v=1:a=1'.format(rendering_video_num), '{}.{}'.format(_output_path, ext)] 
-        print(' '.join(cmd))
         subprocess.call(cmd)
 
 
 if __name__ == '__main__':
-    video_path = 'storage/tv_9dw.mov'
-    cropvideo = CropVideo(video_path)
-    cropvideo.crop('test', '00:00:10', '00:00:3')
-    cropvideo.crop('test2', '00:00:20', '00:00:5')
-    cropvideo.crop('test3', '00:00:50', '00:00:15')
-    print(cropvideo.cropped_video_dict)
-    cropvideo.render()
+    project = Project('test')
+    project.init()
+    test_crop = project.crop_mode('pedistrians')
+    test_crop.crop('test', '00:00:10', '00:00:3')
+    test_crop.crop('test2', '00:00:20', '00:00:5')
+    test_crop.crop('test3', '00:00:50', '00:00:15')
