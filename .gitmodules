@@ -1,3 +1,0 @@
-[submodule "submodule/iGAN"]
-	path = submodule/iGAN
-	url = https://github.com/junyanz/iGAN

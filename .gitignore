@@ -3,6 +3,8 @@
 *.yaml
 __pycache__/*
 *.pyc
-/submodule/
 /junkbox/shape_predictor_68_face_landmarks.dat
 /result/
+/submodule/iGAN/
+/submodule/dlib/
+/submodule/DeepPoseComparison/

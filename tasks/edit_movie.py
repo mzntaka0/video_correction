@@ -4,6 +4,7 @@
 import os
 import sys
 import subprocess
+from multiprocessing import Process, Queue, Lock, set_start_method
 from collections import OrderedDict
 try:
     from bpdb import set_trace
@@ -13,6 +14,8 @@ except ImportError:
 import cv2
 
 from controllers.video_correction import Video
+from controllers.video_edit_utils import string_to_ffmpeg_format
+#from submodule.sixcns.tasks.transcribe_streaming_mic import streaming
 
 
 class ProjectBase:
@@ -164,9 +167,26 @@ class CropVideo:
 
 
 if __name__ == '__main__':
+    # Audio recording parameters
+    #RATE = 16000
+    #CHUNK = int(RATE / 10)  # 100ms
+    #q = Queue()
+    #l = Lock()
+    #p = Process(target=streaming, args=(q,l,))
+    #p.start()
+    #while True:
+    #    pass
+    #    #print('test: {}'.format(q.get()))
+    #    #query = q.get()
+    #    #print(query)
+    #    #time_query = string_to_ffmpeg_format(query)
+    #    #print(time_query)
+    #    
+    #p.terminate()
+    #p.join()
     project = Project('test')
     project.init()
-    test_crop = project.crop_mode('pedistrians')
-    test_crop.crop('test', '00:00:10', '00:00:3')
-    test_crop.crop('test2', '00:00:20', '00:00:5')
-    test_crop.crop('test3', '00:00:50', '00:00:15')
+    project.crop_mode('pedistrians')
+    project.crop_mode('pedistrians').crop('test', '00:00:10', '00:00:3')
+    project.crop_mode('pedistrians').crop('test2', '00:00:20', '00:00:5')
+    project.crop_mode('pedistrians').crop('test3', '00:00:50', '00:00:15')

@@ -1,4 +1,5 @@
 face_recognition
+multiprocess
 face_recognition_models
 Click
 Pillow
