@@ -167,7 +167,6 @@ def search_script_json(splited_path, script_num=None):
 
 
 if __name__ == '__main__':
-    API_KEY = 'AIzaSyCI4XwJ8UTqlPd8twMeeb05hpFIRk0Tb5E'
     JSON_CONFIG = 'config/request_local.json'
     video_path = 'resources/YoutubeDL/ai.mp4'
     audio_path = 'resources/YoutubeDL/ai.wav'
